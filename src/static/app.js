@@ -4,6 +4,28 @@ document.addEventListener("DOMContentLoaded", () => {
   const signupForm = document.getElementById("signup-form");
   const messageDiv = document.getElementById("message");
 
+  // Function to unregister a participant
+  async function unregister(activity, email) {
+    try {
+      const response = await fetch(
+        `/activities/${encodeURIComponent(activity)}/signup?email=${encodeURIComponent(email)}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (response.ok) {
+        fetchActivities(); // Refresh the activities list
+      } else {
+        const result = await response.json();
+        alert(result.detail || "Failed to unregister");
+      }
+    } catch (error) {
+      alert("Error unregistering participant");
+      console.error("Error:", error);
+    }
+  }
+
   // Function to fetch activities from API
   async function fetchActivities() {
     try {
@@ -12,6 +34,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Clear loading message
       activitiesList.innerHTML = "";
+      
+      // Clear activity select dropdown
+      activitySelect.innerHTML = '<option value="">-- Select an activity --</option>';
 
       // Populate activities list
       Object.entries(activities).forEach(([name, details]) => {
@@ -25,6 +50,13 @@ document.addEventListener("DOMContentLoaded", () => {
           <p>${details.description}</p>
           <p><strong>Schedule:</strong> ${details.schedule}</p>
           <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
+          <p><strong>Current Participants:</strong></p>
+          ${details.participants.length === 0 
+            ? '<p class="no-participants">No participants yet</p>'
+            : `<ul>
+                ${details.participants.map((p, idx) => `<li data-activity="${name}" data-email="${p}" data-index="${idx}">${p} <span class="delete-btn">×</span></li>`).join('')}
+              </ul>`
+          }
         `;
 
         activitiesList.appendChild(activityCard);
@@ -34,6 +66,16 @@ document.addEventListener("DOMContentLoaded", () => {
         option.value = name;
         option.textContent = name;
         activitySelect.appendChild(option);
+      });
+      
+      // Attach delete button event listeners
+      document.querySelectorAll(".delete-btn").forEach(btn => {
+        btn.addEventListener("click", async (e) => {
+          const li = e.target.closest("li");
+          const activity = li.dataset.activity;
+          const email = li.dataset.email;
+          await unregister(activity, email);
+        });
       });
     } catch (error) {
       activitiesList.innerHTML = "<p>Failed to load activities. Please try again later.</p>";
@@ -62,6 +104,7 @@ document.addEventListener("DOMContentLoaded", () => {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
+        fetchActivities(); // Refresh the activities list
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
